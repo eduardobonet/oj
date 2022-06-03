@@ -27,11 +27,11 @@ module Oj
   # be made public in the subclasses. If the methods remain private they will
   # not be called during parsing.
   #
-  #    def hash_start(key); end
-  #    def hash_end(key); end
-  #    def array_start(key); end
-  #    def array_end(key); end
-  #    def add_value(value, key); end
+  #    def hash_start(key, line); end
+  #    def hash_end(key, line); end
+  #    def array_start(key, line); end
+  #    def array_end(key, line); end
+  #    def add_value(value, key, line); end
   #    def error(message, line, column); end
   #
   class Saj
@@ -44,19 +44,19 @@ module Oj
     # not be called during parsing.
     private
 
-    def hash_start(key)
+    def hash_start(key, line)
     end
 
-    def hash_end(key)
+    def hash_end(key, line)
     end
 
-    def array_start(key)
+    def array_start(key, line)
     end
 
-    def array_end(key)
+    def array_end(key, line)
     end
 
-    def add_value(value, key)
+    def add_value(value, key, line)
     end
 
     def error(message, line, column)

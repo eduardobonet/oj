@@ -27,23 +27,24 @@ class AllSaj < Oj::Saj
     @calls = []
   end
 
-  def hash_start(key)
+  def hash_start(key, line)
     @calls << [:hash_start, key]
   end
 
-  def hash_end(key)
+  def hash_end(key, line)
     @calls << [:hash_end, key]
   end
 
-  def array_start(key)
+  def array_start(key, line)
     @calls << [:array_start, key]
   end
 
-  def array_end(key)
+  def array_end(key, line)
     @calls << [:array_end, key]
   end
 
-  def add_value(value, key)
+  def add_value(value, key, line)
+    puts("#{value}, #{key}, #{line}")
     @calls << [:add_value, value, key]
   end
 

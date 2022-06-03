@@ -22,6 +22,7 @@ typedef struct _parseInfo {
     char *s;   /* current position in buffer */
     void *stack_min;
     VALUE handler;
+    int   current_line;
     int   has_hash_start;
     int   has_hash_end;
     int   has_array_start;
@@ -79,15 +80,15 @@ inline static void next_non_white(ParseInfo pi) {
         case ' ':
         case '\t':
         case '\f':
-        case '\n':
         case '\r': break;
+        case '\n': pi->current_line++; break;
         case '/': skip_comment(pi); break;
         default: return;
         }
     }
 }
 
-inline static void call_add_value(VALUE handler, VALUE value, const char *key) {
+inline static void call_add_value(VALUE handler, VALUE value, const char *key, int line) {
     volatile VALUE k;
 
     if (0 == key) {
@@ -96,10 +97,10 @@ inline static void call_add_value(VALUE handler, VALUE value, const char *key) {
         k = rb_str_new2(key);
         k = oj_encode(k);
     }
-    rb_funcall(handler, oj_add_value_id, 2, value, k);
+    rb_funcall(handler, oj_add_value_id, 3, value, k, INT2FIX(line));
 }
 
-inline static void call_no_value(VALUE handler, ID method, const char *key) {
+inline static void call_no_value(VALUE handler, ID method, const char *key, int line) {
     volatile VALUE k;
 
     if (0 == key) {
@@ -108,7 +109,7 @@ inline static void call_no_value(VALUE handler, ID method, const char *key) {
         k = rb_str_new2(key);
         k = oj_encode(k);
     }
-    rb_funcall(handler, method, 1, k);
+    rb_funcall(handler, method, 2, k, INT2FIX(line));
 }
 
 static void skip_comment(ParseInfo pi) {
@@ -130,10 +131,10 @@ static void skip_comment(ParseInfo pi) {
     } else if ('/' == *pi->s) {
         for (; 1; pi->s++) {
             switch (*pi->s) {
-            case '\n':
-            case '\r':
             case '\f':
             case '\0': return;
+            case '\n':
+            case '\r': pi->current_line++; return;
             default: break;
             }
         }
@@ -180,9 +181,8 @@ static void read_next(ParseInfo pi, const char *key) {
 
 static void read_hash(ParseInfo pi, const char *key) {
     const char *ks;
-
     if (pi->has_hash_start) {
-        call_no_value(pi->handler, oj_hash_start_id, key);
+        call_no_value(pi->handler, oj_hash_start_id, key, pi->current_line);
     }
     pi->s++;
     next_non_white(pi);
@@ -217,13 +217,13 @@ static void read_hash(ParseInfo pi, const char *key) {
         }
     }
     if (pi->has_hash_end) {
-        call_no_value(pi->handler, oj_hash_end_id, key);
+        call_no_value(pi->handler, oj_hash_end_id, key, pi->current_line);
     }
 }
 
 static void read_array(ParseInfo pi, const char *key) {
     if (pi->has_array_start) {
-        call_no_value(pi->handler, oj_array_start_id, key);
+        call_no_value(pi->handler, oj_array_start_id, key, pi->current_line);
     }
     pi->s++;
     next_non_white(pi);
@@ -247,7 +247,7 @@ static void read_array(ParseInfo pi, const char *key) {
         }
     }
     if (pi->has_array_end) {
-        call_no_value(pi->handler, oj_array_end_id, key);
+        call_no_value(pi->handler, oj_array_end_id, key, pi->current_line);
     }
 }
 
@@ -259,7 +259,7 @@ static void read_str(ParseInfo pi, const char *key) {
         VALUE s = rb_str_new2(text);
 
         s = oj_encode(s);
-        call_add_value(pi->handler, s, key);
+        call_add_value(pi->handler, s, key, pi->current_line);
     }
 }
 
@@ -295,11 +295,11 @@ static void read_num(ParseInfo pi, const char *key) {
         pi->s += 8;
         if (neg) {
             if (pi->has_add_value) {
-                call_add_value(pi->handler, rb_float_new(-OJ_INFINITY), key);
+                call_add_value(pi->handler, rb_float_new(-OJ_INFINITY), key, pi->current_line);
             }
         } else {
             if (pi->has_add_value) {
-                call_add_value(pi->handler, rb_float_new(OJ_INFINITY), key);
+                call_add_value(pi->handler, rb_float_new(OJ_INFINITY), key, pi->current_line);
             }
         }
         return;
@@ -345,7 +345,7 @@ static void read_num(ParseInfo pi, const char *key) {
 
             *pi->s = '\0';
             if (pi->has_add_value) {
-                call_add_value(pi->handler, rb_funcall(rb_cObject, oj_bigdecimal_id, 1, rb_str_new2(start)), key);
+                call_add_value(pi->handler, rb_funcall(rb_cObject, oj_bigdecimal_id, 1, rb_str_new2(start)), key, pi->current_line);
             }
             *pi->s = c;
         } else {
@@ -353,7 +353,7 @@ static void read_num(ParseInfo pi, const char *key) {
                 n = -n;
             }
             if (pi->has_add_value) {
-                call_add_value(pi->handler, LONG2NUM(n), key);
+                call_add_value(pi->handler, LONG2NUM(n), key, pi->current_line);
             }
         }
         return;
@@ -363,7 +363,7 @@ static void read_num(ParseInfo pi, const char *key) {
 
             *pi->s = '\0';
             if (pi->has_add_value) {
-                call_add_value(pi->handler, rb_funcall(rb_cObject, oj_bigdecimal_id, 1, rb_str_new2(start)), key);
+                call_add_value(pi->handler, rb_funcall(rb_cObject, oj_bigdecimal_id, 1, rb_str_new2(start)), key, pi->current_line);
             }
             *pi->s = c;
         } else {
@@ -382,7 +382,7 @@ static void read_num(ParseInfo pi, const char *key) {
                 d *= pow(10.0, e);
             }
             if (pi->has_add_value) {
-                call_add_value(pi->handler, rb_float_new(d), key);
+                call_add_value(pi->handler, rb_float_new(d), key, pi->current_line);
             }
         }
     }
@@ -398,7 +398,7 @@ static void read_true(ParseInfo pi, const char *key) {
     }
     pi->s += 3;
     if (pi->has_add_value) {
-        call_add_value(pi->handler, Qtrue, key);
+        call_add_value(pi->handler, Qtrue, key, pi->current_line);
     }
 }
 
@@ -412,7 +412,7 @@ static void read_false(ParseInfo pi, const char *key) {
     }
     pi->s += 4;
     if (pi->has_add_value) {
-        call_add_value(pi->handler, Qfalse, key);
+        call_add_value(pi->handler, Qfalse, key, pi->current_line);
     }
 }
 
@@ -426,7 +426,7 @@ static void read_nil(ParseInfo pi, const char *key) {
     }
     pi->s += 3;
     if (pi->has_add_value) {
-        call_add_value(pi->handler, Qnil, key);
+        call_add_value(pi->handler, Qnil, key, pi->current_line);
     }
 }
 
@@ -597,6 +597,7 @@ static void saj_parse(VALUE handler, char *json) {
     pi.has_array_end   = rb_respond_to(handler, oj_array_end_id);
     pi.has_add_value   = rb_respond_to(handler, oj_add_value_id);
     pi.has_error       = rb_respond_to(handler, oj_error_id);
+    pi.current_line    = 0;
     read_next(&pi, 0);
     next_non_white(&pi);
     if ('\0' != *pi.s) {

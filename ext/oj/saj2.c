@@ -45,7 +45,7 @@ static void noop(ojParser p) {
 }
 
 static void open_object(ojParser p) {
-    rb_funcall(((Delegate)p->ctx)->handler, oj_hash_start_id, 1, Qnil);
+    rb_funcall(((Delegate)p->ctx)->handler, oj_hash_start_id, 1, Qnil, LONG2NUM(p->line));
 }
 
 static void open_object_key(ojParser p) {
@@ -53,7 +53,7 @@ static void open_object_key(ojParser p) {
     volatile VALUE key = get_key(p);
 
     push_key(d, key);
-    rb_funcall(d->handler, oj_hash_start_id, 1, key);
+    rb_funcall(d->handler, oj_hash_start_id, 1, key, p->line);
 }
 
 static void open_array(ojParser p) {
@@ -65,7 +65,7 @@ static void open_array_key(ojParser p) {
     volatile VALUE key = get_key(p);
 
     push_key(d, key);
-    rb_funcall(d->handler, oj_array_start_id, 1, key);
+    rb_funcall(d->handler, oj_array_start_id, 1, key, p->line);
 }
 
 static void close_object(ojParser p) {
@@ -79,7 +79,7 @@ static void close_object(ojParser p) {
         }
         key = *d->tail;
     }
-    rb_funcall(d->handler, oj_hash_end_id, 1, key);
+    rb_funcall(d->handler, oj_hash_end_id, 1, key, p->line);
 }
 
 static void close_array(ojParser p) {
@@ -93,7 +93,7 @@ static void close_array(ojParser p) {
         }
         key = *d->tail;
     }
-    rb_funcall(d->handler, oj_array_end_id, 1, key);
+    rb_funcall(d->handler, oj_array_end_id, 1, key, p->line);
 }
 
 static void add_null(ojParser p) {
